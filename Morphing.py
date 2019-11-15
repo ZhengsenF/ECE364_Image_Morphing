@@ -125,10 +125,10 @@ class Morpher:
         self.rightImage = rightImage
         self.rightTriangles = rightTriangles
 
-    def getImageAtAlpha(self, alpha):
-        if alpha < 0 or alpha > 1:
-            raise ValueError('alpha should be within [0, 1]')
-        # generate middle triangle
+    # Generates triangles for middle image
+    # return a list of triangles like leftTriangles
+    # called by getImageAtAlpha(self, alpha)
+    def _generateMiddleTri(self, alpha):
         midTriangles = []
         for eachLeft, eachRight in zip(self.leftTriangles, self.rightTriangles):
             points = []
@@ -138,30 +138,48 @@ class Morpher:
                 points.append([x, y])
             newTri = Triangle(np.array(points))
             midTriangles.append(newTri)
+        return midTriangles
+
+    def getImageAtAlpha(self, alpha):
+        if alpha < 0 or alpha > 1:
+            raise ValueError('alpha should be within [0, 1]')
+
+        # generate middle triangle
+        midTriangles = self._generateMiddleTri(alpha)
         # create middle image and begin transformation process
         midImage = np.zeros(self.leftImage.shape)
+
         for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
             # calculate affine transformation matrix
-            # create matrices for calculation
-            A_matrixL = []
-            A_matrixR = []
-            b_matrix = []
-            for eachLP, eachRP, eachMP in zip(eachLeft, eachRight, eachMid):
-                A_matrixL.append([eachLP[0], eachLP[1], 1, 0, 0, 0])
-                A_matrixL.append([0, 0, 0, eachLP[0], eachLP[1], 1])
-                A_matrixR.append([eachRP[0], eachRP[1], 1, 0, 0, 0])
-                A_matrixR.append([0, 0, 0, eachRP[0], eachRP[1], 1])
-                b_matrix.append([eachMP[0]])
-                b_matrix.append([eachMP[1]])
-            A_matrixL = np.array(A_matrixL)
-            A_matrixR = np.array(A_matrixR)
-            b_matrix = np.array(b_matrix)
-            # solve for h in (6,1) size
-            h_matrixL = np.linalg.solve(A_matrixL, b_matrix)
-            h_matrixR = np.linalg.solve(A_matrixR, b_matrix)
-            # rearrange to get affine projection matrix
-            h_matrixL = rearrangeH(h_matrixL)
-            h_matrixR = rearrangeH(h_matrixR)
+            h_matrixL, h_matrixR = hMatrixCalc(eachLeft, eachRight, eachMid)
+            # fill the middle image with affine blend
+
+
+# takes in triangles from left image, right image, and generated middle image
+# returns affine transformation matrices for both left image and right image
+# called by getImageAtAlpha(self, alpha)
+def hMatrixCalc(left, right, mid):
+    # create matrices for calculation
+    A_matrixL = []
+    A_matrixR = []
+    b_matrix = []
+    for eachLP, eachRP, eachMP in zip(left, right, mid):
+        A_matrixL.append([eachLP[0], eachLP[1], 1, 0, 0, 0])
+        A_matrixL.append([0, 0, 0, eachLP[0], eachLP[1], 1])
+        A_matrixR.append([eachRP[0], eachRP[1], 1, 0, 0, 0])
+        A_matrixR.append([0, 0, 0, eachRP[0], eachRP[1], 1])
+        b_matrix.append([eachMP[0]])
+        b_matrix.append([eachMP[1]])
+    A_matrixL = np.array(A_matrixL)
+    A_matrixR = np.array(A_matrixR)
+    b_matrix = np.array(b_matrix)
+    # solve for h in (6,1) size
+    h_matrixL = np.linalg.solve(A_matrixL, b_matrix)
+    h_matrixR = np.linalg.solve(A_matrixR, b_matrix)
+    # rearrange to get affine projection matrix
+    h_matrixL = rearrangeH(h_matrixL)
+    h_matrixR = rearrangeH(h_matrixR)
+    return h_matrixL, h_matrixR
 
 
 # rearrange calculated h matrix form (6,1) to (3,3)
@@ -169,6 +187,7 @@ class Morpher:
 # [h11 h12 h13
 #  h21 h22 h23
 #  0   0   1  ]
+# called byhMatrixCalc(left, right,  mid)
 def rearrangeH(h):
     result = h.reshape(2, 3)
     result = np.concatenate((result, np.array([[0, 0, 1]])), axis=0)
@@ -176,6 +195,7 @@ def rearrangeH(h):
 
 
 # Checks if the input is a list of triangles
+# called by getImageAtAlpha(self, alpha)
 def triangleTypeCheck(triangles):
     for each in triangles:
         if type(each) is not Triangle:

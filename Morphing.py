@@ -82,27 +82,76 @@ class Triangle:
 
     # Returns an n × 2 numpy array, of type float64, containing the (x, y)
     # coordinates of all points with integral
+    # slower implementation
+    # def getPoints(self):
+    #
+    #     # [0, 0] is the origin at upper left corner
+    #     upperLeft = [sys.maxsize, sys.maxsize]  # upper left corner of the rectangle that contains the triangle
+    #     lowerRight = [0, 0]  # lower right corner of the rectangle that contains the triangle
+    #     # find a rectangle that contains the triangle
+    #     for each in self:
+    #         if each[0] < upperLeft[0]:
+    #             upperLeft[0] = each[0]
+    #         if each[1] < upperLeft[1]:
+    #             upperLeft[1] = each[1]
+    #         if each[0] > lowerRight[0]:
+    #             lowerRight[0] = each[0]
+    #         if each[1] > lowerRight[1]:
+    #             lowerRight[1] = each[1]
+    #     # check which points inside the rectangle are in the triangle
+    #     result = []
+    #     for eachX in range(floor(upperLeft[0]), ceil(lowerRight[0] + 1)):
+    #         for eachY in range(floor(upperLeft[1]), ceil(lowerRight[1] + 1)):
+    #             if [eachX, eachY] in self:
+    #                 result.append([eachX, eachY])
+    #     return np.array(result)
+
     def getPoints(self):
-        # [0, 0] is the origin at upper left corner
-        upperLeft = [sys.maxsize, sys.maxsize]  # upper left corner of the rectangle that contains the triangle
-        lowerRight = [0, 0]  # lower right corner of the rectangle that contains the triangle
-        # find a rectangle that contains the triangle
-        for each in self:
-            if each[0] < upperLeft[0]:
-                upperLeft[0] = each[0]
-            if each[1] < upperLeft[1]:
-                upperLeft[1] = each[1]
-            if each[0] > lowerRight[0]:
-                lowerRight[0] = each[0]
-            if each[1] > lowerRight[1]:
-                lowerRight[1] = each[1]
-        # check which points inside the rectangle are in the triangle
-        result = []
-        for eachX in range(floor(upperLeft[0]), ceil(lowerRight[0] + 1)):
-            for eachY in range(floor(upperLeft[1]), ceil(lowerRight[1] + 1)):
-                if [eachX, eachY] in self:
-                    result.append([eachX, eachY])
-        return np.array(result)
+        # ordered as column-row  plane
+        points = sorted([list(x) for x in self], key=order)
+        upper = points[0]
+        middle = points[1]
+        lower = points[2]
+        upperLower = equationCalc(upper, lower)
+        upperMiddle = equationCalc(upper, middle)
+        middleLower = equationCalc(middle, lower)
+        points = []
+        # Find points in the upper part
+        for y in range(ceil(upper[1]), floor(middle[1])):
+            a = upperLower(y)
+            b = upperMiddle(y)
+            for x in range(ceil(min(a, b)), floor(max(a, b)) + 1):
+                points.append([x, y])
+        # Find points in the lower part
+        for y in range(floor(middle[1]), floor(lower[1] + 1)):
+            a = upperLower(y)
+            b = middleLower(y)
+            for x in range(ceil(min(a, b)), floor(max(a, b)) + 1):
+                points.append([x, y])
+        return np.array(points)
+
+
+# calculate linear equation with two points provided
+# calculate m and b value
+# x = my + b
+# return a function takes input y and output corresponding x
+def equationCalc(a, b):
+    if (a[1] - b[1]) != 0:
+        m = (a[0] - b[0]) / (a[1] - b[1])
+    else:
+        m = 0
+    b = a[0] - m * a[1]
+
+    # take y value and return x value
+    def F(y):
+        return m * y + b
+
+    return F
+
+
+# provide order for sorted() in getPoints(self)
+def order(x):
+    return x[1]
 
 
 # Takes three points each as an iterable
@@ -153,6 +202,10 @@ class Morpher:
             # calculate affine transformation matrix
             h_matrixL, h_matrixR = hMatrixCalc(eachLeft, eachRight, eachMid)
             # fill the middle image with affine blend
+            # find points within middle triangle
+            points = eachMid.getPoints()
+            # maps them into right or left image to fill in the color
+            # print(points)
 
 
 # takes in triangles from left image, right image, and generated middle image
@@ -208,9 +261,9 @@ if __name__ == '__main__':
     (leftTri, rightTri) = loadTriangles(leftFile, rightFile)
     # print(getArea([0, 0], [1, 0], [0, 1]))
 
-    triangleTest = Triangle(np.array([[0, 2], [2.0, 0], [4, 2]]))
-    triangleTest.getPoints()
-    # print(triangleTest.getPoints())
+    triangleTest = Triangle(np.array([[1439.0, 0], [853.2, 619.2], [1171.8, 507.6]]))
+    # print(triangleTest.getPoints().sort() == triangleTest.getPoints2().sort())
+    # triangleTest.getPoints2()
 
     leftImage_test = imageio.imread('LeftGray.png')
     rightImage_test = imageio.imread('RightGray.png')

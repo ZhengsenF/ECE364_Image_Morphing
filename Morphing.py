@@ -6,9 +6,11 @@
 # #######################################################
 import numpy as np
 from scipy.spatial import Delaunay
+from scipy.ndimage import map_coordinates
 import matplotlib.pyplot as plt
 import sys
 from math import ceil, floor
+import imageio
 
 
 # This function takes in the full file paths of the text files containing the (x, y)
@@ -18,9 +20,8 @@ def loadTriangles(leftPointFilePath, rightPointFilePath):
     leftPoints = pointsFromFile(leftPointFilePath)
     rightPoints = pointsFromFile(rightPointFilePath)
     leftDelaunay = Delaunay(leftPoints)
-    rightDelaunay = Delaunay(rightPoints)
     leftTriangles = triangleFromDelaunay(leftDelaunay, leftPoints)
-    rightTriangles = triangleFromDelaunay(rightDelaunay, rightPoints)
+    rightTriangles = triangleFromDelaunay(leftDelaunay, rightPoints)
     return tuple([leftTriangles, rightTriangles])
 
 
@@ -111,12 +112,89 @@ def getArea(p1, p2, p3):
                 + p3[0] * (p1[1] - p2[1])) / 2.0)
 
 
+class Morpher:
+    def __init__(self, leftImage, leftTriangles, rightImage, rightTriangles):
+        if leftImage.dtype is not np.dtype('uint8'):
+            raise TypeError('Image type error!')
+        if rightImage.dtype is not np.dtype('uint8'):
+            raise TypeError('Image type error!')
+        triangleTypeCheck(leftTriangles)
+        triangleTypeCheck(rightTriangles)
+        self.leftImage = leftImage
+        self.leftTriangles = leftTriangles
+        self.rightImage = rightImage
+        self.rightTriangles = rightTriangles
+
+    def getImageAtAlpha(self, alpha):
+        if alpha < 0 or alpha > 1:
+            raise ValueError('alpha should be within [0, 1]')
+        # generate middle triangle
+        midTriangles = []
+        for eachLeft, eachRight in zip(self.leftTriangles, self.rightTriangles):
+            points = []
+            for eachLeftPoint, eachRightPoint in zip(eachLeft, eachRight):
+                x = eachLeftPoint[0] * (1 - alpha) + eachRightPoint[0] * alpha  # x coordinate of middle triangle
+                y = eachLeftPoint[1] * (1 - alpha) + eachRightPoint[1] * alpha  # y coordinate of middle triangle
+                points.append([x, y])
+            newTri = Triangle(np.array(points))
+            midTriangles.append(newTri)
+        # create middle image and begin transformation process
+        midImage = np.zeros(self.leftImage.shape)
+        for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
+            # calculate affine transformation matrix
+            # create matrices for calculation
+            A_matrixL = []
+            A_matrixR = []
+            b_matrix = []
+            for eachLP, eachRP, eachMP in zip(eachLeft, eachRight, eachMid):
+                A_matrixL.append([eachLP[0], eachLP[1], 1, 0, 0, 0])
+                A_matrixL.append([0, 0, 0, eachLP[0], eachLP[1], 1])
+                A_matrixR.append([eachRP[0], eachRP[1], 1, 0, 0, 0])
+                A_matrixR.append([0, 0, 0, eachRP[0], eachRP[1], 1])
+                b_matrix.append([eachMP[0]])
+                b_matrix.append([eachMP[1]])
+            A_matrixL = np.array(A_matrixL)
+            A_matrixR = np.array(A_matrixR)
+            b_matrix = np.array(b_matrix)
+            # solve for h in (6,1) size
+            h_matrixL = np.linalg.solve(A_matrixL, b_matrix)
+            h_matrixR = np.linalg.solve(A_matrixR, b_matrix)
+            # rearrange to get affine projection matrix
+            h_matrixL = rearrangeH(h_matrixL)
+            h_matrixR = rearrangeH(h_matrixR)
+
+
+# rearrange calculated h matrix form (6,1) to (3,3)
+# returns affine projection matrix, in format:
+# [h11 h12 h13
+#  h21 h22 h23
+#  0   0   1  ]
+def rearrangeH(h):
+    result = h.reshape(2, 3)
+    result = np.concatenate((result, np.array([[0, 0, 1]])), axis=0)
+    return result
+
+
+# Checks if the input is a list of triangles
+def triangleTypeCheck(triangles):
+    for each in triangles:
+        if type(each) is not Triangle:
+            raise TypeError('input must be list of triangles')
+
+
 if __name__ == '__main__':
     leftFile = 'points.left.txt'
     rightFile = 'points.right.txt'
     (leftTri, rightTri) = loadTriangles(leftFile, rightFile)
-    print(getArea([0, 0], [1, 0], [0, 1]))
+    # print(getArea([0, 0], [1, 0], [0, 1]))
 
     triangleTest = Triangle(np.array([[0, 2], [2.0, 0], [4, 2]]))
     triangleTest.getPoints()
-    print(triangleTest.getPoints())
+    # print(triangleTest.getPoints())
+
+    leftImage_test = imageio.imread('LeftGray.png')
+    rightImage_test = imageio.imread('RightGray.png')
+    # print(leftImage_test[4][1])
+    # print(map_coordinates(leftImage_test, [[1],[1]]))
+    morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
+    morpher_test.getImageAtAlpha(0.25)

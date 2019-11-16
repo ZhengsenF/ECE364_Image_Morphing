@@ -208,6 +208,7 @@ class Morpher:
             points = eachMid.getPoints()
             # maps them into right or left image to fill in the color
             for eachPoint in points:
+
                 leftPoint = affineTransform(eachPoint, h_inverseL)
                 rightPoint = affineTransform(eachPoint, h_inverseR)
                 blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
@@ -232,11 +233,15 @@ def alphaBlend(point, image, alpha):
     elif y1 == image.shape[0]:
         y2 -= 1
         y1 -= 1
+    elif y1 == y2:
+        y2 -= 1
     if x == x1 and x == 0:
         x2 = x2 + 1
     elif x2 == image.shape[1]:
         x1 -= 1
         x2 -= 1
+    elif x1 == x2:
+        x1 -= 1
     upperLeft = image[y2][x1]
     upperRight = image[y2][x2]
     lowerLeft = image[y1][x1]
@@ -326,7 +331,9 @@ if __name__ == '__main__':
     morphed = morpher_test.getImageAtAlpha(0.25)
     morphed = morphed.astype(np.uint8)
     imageio.imwrite('result.png', morphed)
-
+    print(morphed[187][404])
+    plt.imshow(morphed)
+    plt.show()
 
     # point_test = np.array([0.5, 1.5])
     # matrix_test = np.array([[1,2,3],

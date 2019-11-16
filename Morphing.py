@@ -201,11 +201,41 @@ class Morpher:
         for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
             # calculate affine transformation matrix
             h_matrixL, h_matrixR = hMatrixCalc(eachLeft, eachRight, eachMid)
+            h_inverseL = np.linalg.inv(h_matrixL)
+            h_inverseR = np.linalg.inv(h_matrixR)
             # fill the middle image with affine blend
             # find points within middle triangle
             points = eachMid.getPoints()
             # maps them into right or left image to fill in the color
-            # print(points)
+            for eachPoint in points:
+                leftPoint = affineTransform(eachPoint, h_inverseL)
+                rightPoint = affineTransform(eachPoint, h_inverseR)
+                # blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
+                # blended += alphaBlend(rightPoint, self.rightImage, alpha)
+                blended = 0
+                midImage[eachPoint[0]][eachPoint[1]] = blended
+        return midImage
+
+
+# takes point as a np array of x and y coordinate
+# image from imageio as a np array
+# alpha as alpha blending parameter
+# returns blended grey scale value
+def alphaBlend(point, image, alpha):
+    interpolated = map_coordinates(image, [[point[0]], [point[1]]])
+    return interpolated * alpha
+
+
+# take in a point in middle triangle and inverse H matrix
+# to map the point back to original image
+# return x and y coordinates as a list
+# called by getImageAtAlpha(self, alpha)
+def affineTransform(point, matrix):
+    pMatrix = point.reshape(2, 1)
+    pMatrix = np.append(pMatrix, [[1]], axis=0)
+    mapped = np.matmul(matrix, pMatrix)
+    result = [mapped[0][0], mapped[1][0]]
+    return result
 
 
 # takes in triangles from left image, right image, and generated middle image
@@ -271,3 +301,13 @@ if __name__ == '__main__':
     # print(map_coordinates(leftImage_test, [[1],[1]]))
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
     morpher_test.getImageAtAlpha(0.25)
+
+    # point_test = np.array([0.5, 1])
+    # matrix_test = np.array([[1,2,3],
+    #                         [4,5,6],
+    #                         [0,0,1]])
+    # affineTransform(point_test, matrix_test)
+    #
+    # print(alphaBlend(point_test,matrix_test,0.5))
+
+

@@ -185,7 +185,6 @@ class Morpher:
                 x = eachLeftPoint[0] * (1 - alpha) + eachRightPoint[0] * alpha  # x coordinate of middle triangle
                 y = eachLeftPoint[1] * (1 - alpha) + eachRightPoint[1] * alpha  # y coordinate of middle triangle
                 points.append([x, y])
-                print(f'{eachLeftPoint}    {eachRightPoint}     {np.array([x, y])}')
             newTri = Triangle(np.array(points))
             midTriangles.append(newTri)
         return midTriangles
@@ -196,8 +195,8 @@ class Morpher:
 
         # generate middle triangle
         midTriangles = self._generateMiddleTri(alpha)
-        return midTriangles
         # create middle image and begin transformation process
+        print(self.leftImage.shape)
         midImage = np.zeros(self.leftImage.shape)
 
         for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
@@ -210,13 +209,23 @@ class Morpher:
             points = eachMid.getPoints()
             # maps them into right or left image to fill in the color
             for eachPoint in points:
-                leftPoint = affineTransform(eachPoint, h_inverseL)
-                rightPoint = affineTransform(eachPoint, h_inverseR)
-                # blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
-                # blended += alphaBlend(rightPoint, self.rightImage, alpha)
-                blended = 0
-                midImage[eachPoint[0]][eachPoint[1]] = blended
-        # return midImage
+                try:
+                    leftPoint = affineTransform(eachPoint, h_inverseL)
+                    rightPoint = affineTransform(eachPoint, h_inverseR)
+                    # blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
+                    # blended += alphaBlend(rightPoint, self.rightImage, alpha)
+                    blended = 0
+                    midImage[eachPoint[1]][eachPoint[0]] = blended
+                except IndexError:
+                    print('\n\n')
+                    print("left:")
+                    print(eachLeft)
+                    print('\nright:')
+                    print(eachRight)
+                    print('\nmid:')
+                    print(eachMid)
+                    break
+        return midImage
 
 
 # takes point as a np array of x and y coordinate
@@ -307,5 +316,6 @@ if __name__ == '__main__':
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
     midTriangles = morpher_test.getImageAtAlpha(0.25)
     # showDelaunay()
+
 
 

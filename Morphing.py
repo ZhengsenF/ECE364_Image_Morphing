@@ -185,6 +185,7 @@ class Morpher:
                 x = eachLeftPoint[0] * (1 - alpha) + eachRightPoint[0] * alpha  # x coordinate of middle triangle
                 y = eachLeftPoint[1] * (1 - alpha) + eachRightPoint[1] * alpha  # y coordinate of middle triangle
                 points.append([x, y])
+                print(f'{eachLeftPoint}    {eachRightPoint}     {np.array([x, y])}')
             newTri = Triangle(np.array(points))
             midTriangles.append(newTri)
         return midTriangles
@@ -195,6 +196,7 @@ class Morpher:
 
         # generate middle triangle
         midTriangles = self._generateMiddleTri(alpha)
+        return midTriangles
         # create middle image and begin transformation process
         midImage = np.zeros(self.leftImage.shape)
 
@@ -214,7 +216,7 @@ class Morpher:
                 # blended += alphaBlend(rightPoint, self.rightImage, alpha)
                 blended = 0
                 midImage[eachPoint[0]][eachPoint[1]] = blended
-        return midImage
+        # return midImage
 
 
 # takes point as a np array of x and y coordinate
@@ -288,6 +290,9 @@ def triangleTypeCheck(triangles):
 if __name__ == '__main__':
     leftFile = 'points.left.txt'
     rightFile = 'points.right.txt'
+    leftPoints_test = pointsFromFile(leftFile)
+    leftDelaunay_test = Delaunay(leftPoints_test)
+
     (leftTri, rightTri) = loadTriangles(leftFile, rightFile)
     # print(getArea([0, 0], [1, 0], [0, 1]))
 
@@ -300,14 +305,7 @@ if __name__ == '__main__':
     # print(leftImage_test[4][1])
     # print(map_coordinates(leftImage_test, [[1],[1]]))
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    morpher_test.getImageAtAlpha(0.25)
-
-    # point_test = np.array([0.5, 1])
-    # matrix_test = np.array([[1,2,3],
-    #                         [4,5,6],
-    #                         [0,0,1]])
-    # affineTransform(point_test, matrix_test)
-    #
-    # print(alphaBlend(point_test,matrix_test,0.5))
+    midTriangles = morpher_test.getImageAtAlpha(0.25)
+    # showDelaunay()
 
 

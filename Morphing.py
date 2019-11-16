@@ -196,7 +196,6 @@ class Morpher:
         # generate middle triangle
         midTriangles = self._generateMiddleTri(alpha)
         # create middle image and begin transformation process
-        print(self.leftImage.shape)
         midImage = np.zeros(self.leftImage.shape)
 
         for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
@@ -209,22 +208,11 @@ class Morpher:
             points = eachMid.getPoints()
             # maps them into right or left image to fill in the color
             for eachPoint in points:
-                try:
-                    leftPoint = affineTransform(eachPoint, h_inverseL)
-                    rightPoint = affineTransform(eachPoint, h_inverseR)
-                    # blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
-                    # blended += alphaBlend(rightPoint, self.rightImage, alpha)
-                    blended = 0
-                    midImage[eachPoint[1]][eachPoint[0]] = blended
-                except IndexError:
-                    print('\n\n')
-                    print("left:")
-                    print(eachLeft)
-                    print('\nright:')
-                    print(eachRight)
-                    print('\nmid:')
-                    print(eachMid)
-                    break
+                leftPoint = affineTransform(eachPoint, h_inverseL)
+                rightPoint = affineTransform(eachPoint, h_inverseR)
+                blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
+                blended += alphaBlend(rightPoint, self.rightImage, alpha)
+                midImage[eachPoint[1]][eachPoint[0]] = blended
         return midImage
 
 
@@ -299,9 +287,6 @@ def triangleTypeCheck(triangles):
 if __name__ == '__main__':
     leftFile = 'points.left.txt'
     rightFile = 'points.right.txt'
-    leftPoints_test = pointsFromFile(leftFile)
-    leftDelaunay_test = Delaunay(leftPoints_test)
-
     (leftTri, rightTri) = loadTriangles(leftFile, rightFile)
     # print(getArea([0, 0], [1, 0], [0, 1]))
 
@@ -314,8 +299,17 @@ if __name__ == '__main__':
     # print(leftImage_test[4][1])
     # print(map_coordinates(leftImage_test, [[1],[1]]))
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    midTriangles = morpher_test.getImageAtAlpha(0.25)
-    # showDelaunay()
+    morphed = morpher_test.getImageAtAlpha(0.25)
 
+    plt.imshow(morphed)
+    plt.show()
+
+    # point_test = np.array([0.5, 1])
+    # matrix_test = np.array([[1,2,3],
+    #                         [4,5,6],
+    #                         [0,0,1]])
+    # affineTransform(point_test, matrix_test)
+    #
+    # print(alphaBlend(point_test,matrix_test,0.5))
 
 

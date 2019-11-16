@@ -212,7 +212,7 @@ class Morpher:
                 rightPoint = affineTransform(eachPoint, h_inverseR)
                 blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
                 blended += alphaBlend(rightPoint, self.rightImage, alpha)
-                midImage[eachPoint[1]][eachPoint[0]] = blended
+                midImage[eachPoint[1]][eachPoint[0]] = int(blended)
         return midImage
 
 
@@ -221,7 +221,30 @@ class Morpher:
 # alpha as alpha blending parameter
 # returns blended grey scale value
 def alphaBlend(point, image, alpha):
-    interpolated = map_coordinates(image, [[point[0]], [point[1]]])
+    x = point[0]
+    y = point[1]
+    x1 = floor(x)
+    x2 = ceil(x)
+    y1 = ceil(y)
+    y2 = floor(y)
+    if y2 == y1 and y1 == 0:
+        y1 = y1 + 1
+    elif y1 == image.shape[0]:
+        y2 -= 1
+        y1 -= 1
+    if x == x1 and x == 0:
+        x2 = x2 + 1
+    elif x2 == image.shape[1]:
+        x1 -= 1
+        x2 -= 1
+    upperLeft = image[y2][x1]
+    upperRight = image[y2][x2]
+    lowerLeft = image[y1][x1]
+    lowerRight = image[y1][x2]
+    interpolated = (x2 - x) * (y1 - y) * upperLeft
+    interpolated += (x - x1) * (y1 - y) * upperRight
+    interpolated += (x2 - x) * (y - y2) * lowerLeft
+    interpolated += (x - x1) * (y - y2) * lowerRight
     return interpolated * alpha
 
 
@@ -298,18 +321,19 @@ if __name__ == '__main__':
     rightImage_test = imageio.imread('RightGray.png')
     # print(leftImage_test[4][1])
     # print(map_coordinates(leftImage_test, [[1],[1]]))
+    # print(leftImage_test.shape)
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
     morphed = morpher_test.getImageAtAlpha(0.25)
+    morphed = morphed.astype(np.uint8)
+    imageio.imwrite('result.png', morphed)
 
-    plt.imshow(morphed)
-    plt.show()
 
-    # point_test = np.array([0.5, 1])
+    # point_test = np.array([0.5, 1.5])
     # matrix_test = np.array([[1,2,3],
     #                         [4,5,6],
     #                         [0,0,1]])
     # affineTransform(point_test, matrix_test)
     #
-    # print(alphaBlend(point_test,matrix_test,0.5))
+    # print(alphaBlend(point_test,matrix_test,1))
 
 

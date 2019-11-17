@@ -224,10 +224,13 @@ class Morpher:
         tempDir = tempfile.TemporaryDirectory()
         alphaIncrement = 1 / (frameCount - 1)
         for index in range(frameCount):
-            alpha = index * alphaIncrement
-            image = self.getImageAtAlpha(alpha)
-            path = os.path.join(tempDir.name, f'{index}.png')
-            imageio.imwrite(path, image)
+            try:
+                alpha = index * alphaIncrement
+                image = self.getImageAtAlpha(alpha)
+                path = os.path.join(tempDir.name, f'{index}.png')
+                imageio.imwrite(path, image)
+            except IndexError:
+                print(alpha)
         if includeReversed is False:
             (
                 ffmpeg
@@ -376,8 +379,8 @@ if __name__ == '__main__':
     # affineTransform(point_test, matrix_test)
     #
     # print(alphaBlend(point_test,matrix_test,1))
-    tempDir_test = tempfile.TemporaryDirectory()
-    print(tempDir_test.name)
-    image_test = os.path.join(tempDir_test.name, '1.png')
-    print(image_test)
+    # tempDir_test = tempfile.TemporaryDirectory()
+    # print(tempDir_test.name)
+    # image_test = os.path.join(tempDir_test.name, '1.png')
+    # print(image_test)
     morpher_test.saveVideo('out.mp4', 10, 5, False)

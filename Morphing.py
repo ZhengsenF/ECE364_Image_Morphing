@@ -6,11 +6,14 @@
 # #######################################################
 import numpy as np
 from scipy.spatial import Delaunay
-from scipy.ndimage import map_coordinates
+# from scipy.ndimage import map_coordinates
 import matplotlib.pyplot as plt
-import sys
+# import sys
 from math import ceil, floor
 import imageio
+import tempfile
+import os
+import ffmpeg
 
 
 # This function takes in the full file paths of the text files containing the (x, y)
@@ -208,13 +211,44 @@ class Morpher:
             points = eachMid.getPoints()
             # maps them into right or left image to fill in the color
             for eachPoint in points:
-
                 leftPoint = affineTransform(eachPoint, h_inverseL)
                 rightPoint = affineTransform(eachPoint, h_inverseR)
                 blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
                 blended += alphaBlend(rightPoint, self.rightImage, alpha)
                 midImage[eachPoint[1]][eachPoint[0]] = int(blended)
         return midImage
+
+    def saveVideo(self, targetFilePath, frameCount, frameRate, includeReversed):
+        if frameCount < 10:
+            raise ValueError('frameCount must be greater than 10')
+        tempDir = tempfile.TemporaryDirectory()
+        alphaIncrement = 1 / (frameCount - 1)
+        for index in range(frameCount):
+            alpha = index * alphaIncrement
+            image = self.getImageAtAlpha(alpha)
+            path = os.path.join(tempDir.name, f'{index}.png')
+            imageio.imwrite(path, image)
+        if includeReversed is False:
+            (
+                ffmpeg
+                .input(os.path.join(tempDir.name, '*.png'), pattern_type='glob', framerate=frameRate)
+                .output(targetFilePath)
+                .run()
+            )
+        else:
+            tempVideoPath = os.path.join(tempDir.name, 'temp.mp4')
+            (
+                ffmpeg
+                .input(os.path.join(tempDir.name, '*.png'), pattern_type='glob', framerate=frameRate)
+                .output(tempVideoPath)
+                .run()
+            )
+            in1 = ffmpeg.input(tempVideoPath)
+            in2 = ffmpeg.input(tempVideoPath)
+            v2 = in2.video.filter('reverse')
+            joined = ffmpeg.concat(in1, v2).node
+            out = ffmpeg.output(joined, targetFilePath)
+            out.run()
 
 
 # takes point as a np array of x and y coordinate
@@ -328,12 +362,12 @@ if __name__ == '__main__':
     # print(map_coordinates(leftImage_test, [[1],[1]]))
     # print(leftImage_test.shape)
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    morphed = morpher_test.getImageAtAlpha(0.25)
-    morphed = morphed.astype(np.uint8)
-    imageio.imwrite('result.png', morphed)
-    print(morphed[187][404])
-    plt.imshow(morphed)
-    plt.show()
+    # morphed = morpher_test.getImageAtAlpha(0.25)
+    # morphed = morphed.astype(np.uint8)
+    # imageio.imwrite('result.png', morphed)
+    # # print(morphed[187][404])
+    # plt.imshow(morphed)
+    # plt.show()
 
     # point_test = np.array([0.5, 1.5])
     # matrix_test = np.array([[1,2,3],
@@ -342,5 +376,8 @@ if __name__ == '__main__':
     # affineTransform(point_test, matrix_test)
     #
     # print(alphaBlend(point_test,matrix_test,1))
-
-
+    tempDir_test = tempfile.TemporaryDirectory()
+    print(tempDir_test.name)
+    image_test = os.path.join(tempDir_test.name, '1.png')
+    print(image_test)
+    morpher_test.saveVideo('out.mp4', 10, 5, False)

@@ -6,7 +6,7 @@
 # #######################################################
 import numpy as np
 from scipy.spatial import Delaunay
-# from scipy.ndimage import map_coordinates
+from scipy.interpolate import RectBivariateSpline
 import matplotlib.pyplot as plt
 # import sys
 from math import ceil, floor
@@ -18,7 +18,8 @@ import ffmpeg
 
 # This function takes in the full file paths of the text files containing the (x, y)
 # coordinates of a list of points, for both the left and right images.
-# returns the tuple (leftTriangles, rightTriangles), where each is a list of instances of the Triangle class.
+# returns the tuple (leftTriangles, rightTriangles), where each is a list of instances
+# of the Triangle class.
 def loadTriangles(leftPointFilePath, rightPointFilePath):
     leftPoints = pointsFromFile(leftPointFilePath)
     rightPoints = pointsFromFile(rightPointFilePath)
@@ -89,7 +90,8 @@ class Triangle:
     # def getPoints(self):
     #
     #     # [0, 0] is the origin at upper left corner
-    #     upperLeft = [sys.maxsize, sys.maxsize]  # upper left corner of the rectangle that contains the triangle
+    #     upperLeft = [sys.maxsize, sys.maxsize]  # upper left corner of the rectangle
+    #     that contains the triangle
     #     lowerRight = [0, 0]  # lower right corner of the rectangle that contains the triangle
     #     # find a rectangle that contains the triangle
     #     for each in self:
@@ -185,8 +187,10 @@ class Morpher:
         for eachLeft, eachRight in zip(self.leftTriangles, self.rightTriangles):
             points = []
             for eachLeftPoint, eachRightPoint in zip(eachLeft, eachRight):
-                x = eachLeftPoint[0] * (1 - alpha) + eachRightPoint[0] * alpha  # x coordinate of middle triangle
-                y = eachLeftPoint[1] * (1 - alpha) + eachRightPoint[1] * alpha  # y coordinate of middle triangle
+                # x coordinate of middle triangle
+                x = eachLeftPoint[0] * (1 - alpha) + eachRightPoint[0] * alpha
+                # y coordinate of middle triangle
+                y = eachLeftPoint[1] * (1 - alpha) + eachRightPoint[1] * alpha
                 points.append([x, y])
             newTri = Triangle(np.array(points))
             midTriangles.append(newTri)
@@ -200,6 +204,14 @@ class Morpher:
         midTriangles = self._generateMiddleTri(alpha)
         # create middle image and begin transformation process
         midImage = np.zeros(self.leftImage.shape)
+        leftInterp = RectBivariateSpline(range(self.leftImage.shape[0]),
+                                         range(self.leftImage.shape[1]),
+                                         self.leftImage,
+                                         kx=1, ky=1)
+        rightInterp = RectBivariateSpline(range(self.rightImage.shape[0]),
+                                          range(self.rightImage.shape[1]),
+                                          self.rightImage,
+                                          kx=1, ky=1)
 
         for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
             # calculate affine transformation matrix
@@ -209,13 +221,14 @@ class Morpher:
             # fill the middle image with affine blend
             # find points within middle triangle
             points = eachMid.getPoints()
-            # maps them into right or left image to fill in the color
-            for eachPoint in points:
-                leftPoint = affineTransform(eachPoint, h_inverseL)
-                rightPoint = affineTransform(eachPoint, h_inverseR)
-                blended = alphaBlend(leftPoint, self.leftImage, (1 - alpha))
-                blended += alphaBlend(rightPoint, self.rightImage, alpha)
-                midImage[eachPoint[1]][eachPoint[0]] = int(blended)
+            # insert 1 and transpose to make the become array of vertical matrix
+            # for faster matrix operation
+            points_matrix = np.insert(points, 2, 1, axis=1).T
+            leftPoint = np.matmul(h_inverseL, points_matrix)  # [0]: x ; [1]: y
+            rightPoint = np.matmul(h_inverseR, points_matrix)
+            midImage[points[:, 1], points[:, 0]] = (1 - alpha) * leftInterp.ev(leftPoint[1], leftPoint[0])
+            midImage[points[:, 1], points[:, 0]] += alpha * rightInterp.ev(rightPoint[1], rightPoint[0])
+        midImage = midImage.astype(np.uint8)
         return midImage
 
     def saveVideo(self, targetFilePath, frameCount, frameRate, includeReversed):
@@ -365,9 +378,8 @@ if __name__ == '__main__':
     # print(map_coordinates(leftImage_test, [[1],[1]]))
     # print(leftImage_test.shape)
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    # morphed = morpher_test.getImageAtAlpha(0.25)
-    # morphed = morphed.astype(np.uint8)
-    # imageio.imwrite('result.png', morphed)
+    morphed = morpher_test.getImageAtAlpha(0)
+    imageio.imwrite('result.png', morphed)
     # # print(morphed[187][404])
     # plt.imshow(morphed)
     # plt.show()
@@ -383,4 +395,4 @@ if __name__ == '__main__':
     # print(tempDir_test.name)
     # image_test = os.path.join(tempDir_test.name, '1.png')
     # print(image_test)
-    morpher_test.saveVideo('out.mp4', 10, 5, False)
+    # morpher_test.saveVideo('out.mp4', 10, 5, False)

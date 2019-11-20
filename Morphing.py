@@ -222,23 +222,29 @@ class Morpher:
             # fill the middle image with affine blend
             # find points within middle triangle
             points = eachMid.getPoints()
+            # check for items out of bound
+            points = checkBoundary(points, self.leftImage.shape[1], self.leftImage.shape[0])
+            # for index, each in enumerate(points):
+            #     if each[0] >= self.leftImage.shape[1] or each[1] >= self.leftImage.shape[0]:
+            #         print(each, index)
+            #         points = np.delete(points, index, axis=0)
+            #         printPoint(points)
+            #         print()
             # insert 1 and transpose to make the become array of vertical matrix
             # for faster matrix operation
-            for index, each in enumerate(points):
-                if each[0] >= self.leftImage.shape[1] or each[1] >= self.leftImage.shape[0]:
-                    print(index)
-                    points = np.delete(points, index, axis=0)
             points_matrix = np.insert(points, 2, 1, axis=1).T
             leftPoint = np.matmul(h_inverseL, points_matrix)  # [0]: x ; [1]: y
             rightPoint = np.matmul(h_inverseR, points_matrix)
+            # midImage[points[:, 1], points[:, 0]] = (1 - alpha) * leftInterp.ev(leftPoint[1], leftPoint[0])
+            # midImage[points[:, 1], points[:, 0]] += alpha * rightInterp.ev(rightPoint[1], rightPoint[0])
             try:
                 midImage[points[:, 1], points[:, 0]] = (1 - alpha) * leftInterp.ev(leftPoint[1], leftPoint[0])
                 midImage[points[:, 1], points[:, 0]] += alpha * rightInterp.ev(rightPoint[1], rightPoint[0])
             except IndexError:
                 # print()
-                for each in points:
-                    print(each)
-
+                for index, each in enumerate(points):
+                    print(each, index)
+                    print(each[0] >= self.leftImage.shape[1])
         midImage = midImage.astype(np.uint8)
         return midImage
 
@@ -253,6 +259,7 @@ class Morpher:
                 image = self.getImageAtAlpha(alpha)
                 path = os.path.join(tempDir.name, f'{index}.png')
                 imageio.imwrite(path, image)
+                print('generating:', alpha)
             except IndexError:
                 print(alpha)
         if includeReversed is False:
@@ -278,40 +285,58 @@ class Morpher:
             out.run()
 
 
+# takes points, self.leftImage.shape[1], self.leftImage.shape[0]
+# recursive call to manipulate array of points
+# to remove points that are out of bounds
+# return np.array of points
+def checkBoundary(points, boundaryX, boundaryY):
+    for index, each in enumerate(points):
+        if each[0] >= boundaryX or each[1] >= boundaryY:
+            points = np.delete(points, index, axis=0)
+            points = checkBoundary(points, boundaryX, boundaryY)
+            break
+    return points
+
+
+def printPoint(points):
+    for index, each in enumerate(points):
+        print(index, ':', each)
+
+
 # takes point as a np array of x and y coordinate
 # image from imageio as a np array
 # alpha as alpha blending parameter
 # returns blended grey scale value
-def alphaBlend(point, image, alpha):
-    x = point[0]
-    y = point[1]
-    x1 = floor(x)
-    x2 = ceil(x)
-    y1 = ceil(y)
-    y2 = floor(y)
-    if y2 == y1 and y1 == 0:
-        y1 = y1 + 1
-    elif y1 == image.shape[0]:
-        y2 -= 1
-        y1 -= 1
-    elif y1 == y2:
-        y2 -= 1
-    if x == x1 and x == 0:
-        x2 = x2 + 1
-    elif x2 == image.shape[1]:
-        x1 -= 1
-        x2 -= 1
-    elif x1 == x2:
-        x1 -= 1
-    upperLeft = image[y2][x1]
-    upperRight = image[y2][x2]
-    lowerLeft = image[y1][x1]
-    lowerRight = image[y1][x2]
-    interpolated = (x2 - x) * (y1 - y) * upperLeft
-    interpolated += (x - x1) * (y1 - y) * upperRight
-    interpolated += (x2 - x) * (y - y2) * lowerLeft
-    interpolated += (x - x1) * (y - y2) * lowerRight
-    return interpolated * alpha
+# def alphaBlend(point, image, alpha):
+#     x = point[0]
+#     y = point[1]
+#     x1 = floor(x)
+#     x2 = ceil(x)
+#     y1 = ceil(y)
+#     y2 = floor(y)
+#     if y2 == y1 and y1 == 0:
+#         y1 = y1 + 1
+#     elif y1 == image.shape[0]:
+#         y2 -= 1
+#         y1 -= 1
+#     elif y1 == y2:
+#         y2 -= 1
+#     if x == x1 and x == 0:
+#         x2 = x2 + 1
+#     elif x2 == image.shape[1]:
+#         x1 -= 1
+#         x2 -= 1
+#     elif x1 == x2:
+#         x1 -= 1
+#     upperLeft = image[y2][x1]
+#     upperRight = image[y2][x2]
+#     lowerLeft = image[y1][x1]
+#     lowerRight = image[y1][x2]
+#     interpolated = (x2 - x) * (y1 - y) * upperLeft
+#     interpolated += (x - x1) * (y1 - y) * upperRight
+#     interpolated += (x2 - x) * (y - y2) * lowerLeft
+#     interpolated += (x - x1) * (y - y2) * lowerRight
+#     return interpolated * alpha
 
 
 # take in a point in middle triangle and inverse H matrix
@@ -389,7 +414,7 @@ if __name__ == '__main__':
     # print(map_coordinates(leftImage_test, [[1],[1]]))
     # print(leftImage_test.shape)
     morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    morphed = morpher_test.getImageAtAlpha(0)
+    morphed = morpher_test.getImageAtAlpha(1/9)
     imageio.imwrite('result.png', morphed)
     # # print(morphed[187][404])
     # plt.imshow(morphed)
@@ -406,4 +431,4 @@ if __name__ == '__main__':
     # print(tempDir_test.name)
     # image_test = os.path.join(tempDir_test.name, '1.png')
     # print(image_test)
-    # morpher_test.saveVideo('out.mp4', 10, 5, False)
+    morpher_test.saveVideo('out.mp4', 10, 5, False)

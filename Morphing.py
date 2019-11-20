@@ -15,7 +15,7 @@ import tempfile
 import os
 import ffmpeg
 from pprint import pprint as pp
-
+import gc
 
 # This function takes in the full file paths of the text files containing the (x, y)
 # coordinates of a list of points, for both the left and right images.
@@ -84,33 +84,6 @@ class Triangle:
         area2 = getArea(self.vertices[0], point, self.vertices[2])
         area3 = getArea(self.vertices[0], self.vertices[1], point)
         return area == area1 + area2 + area3
-
-    # Returns an n × 2 numpy array, of type float64, containing the (x, y)
-    # coordinates of all points with integral
-    # slower implementation
-    # def getPoints(self):
-    #
-    #     # [0, 0] is the origin at upper left corner
-    #     upperLeft = [sys.maxsize, sys.maxsize]  # upper left corner of the rectangle
-    #     that contains the triangle
-    #     lowerRight = [0, 0]  # lower right corner of the rectangle that contains the triangle
-    #     # find a rectangle that contains the triangle
-    #     for each in self:
-    #         if each[0] < upperLeft[0]:
-    #             upperLeft[0] = each[0]
-    #         if each[1] < upperLeft[1]:
-    #             upperLeft[1] = each[1]
-    #         if each[0] > lowerRight[0]:
-    #             lowerRight[0] = each[0]
-    #         if each[1] > lowerRight[1]:
-    #             lowerRight[1] = each[1]
-    #     # check which points inside the rectangle are in the triangle
-    #     result = []
-    #     for eachX in range(floor(upperLeft[0]), ceil(lowerRight[0] + 1)):
-    #         for eachY in range(floor(upperLeft[1]), ceil(lowerRight[1] + 1)):
-    #             if [eachX, eachY] in self:
-    #                 result.append([eachX, eachY])
-    #     return np.array(result)
 
     def getPoints(self):
         # ordered as column-row  plane
@@ -231,7 +204,7 @@ class Morpher:
             rightPoint = np.matmul(h_inverseR, points_matrix)
             midImage[points[:, 1], points[:, 0]] = (1 - alpha) * leftInterp.ev(leftPoint[1], leftPoint[0])
             midImage[points[:, 1], points[:, 0]] += alpha * rightInterp.ev(rightPoint[1], rightPoint[0])
-        return midImage
+        return midImage.astype(np.uint8)
 
     def saveVideo(self, targetFilePath, frameCount, frameRate, includeReversed):
         if frameCount < 10:
@@ -239,14 +212,14 @@ class Morpher:
         tempDir = tempfile.TemporaryDirectory()
         alphaIncrement = 1 / (frameCount - 1)
         for index in range(frameCount):
-            try:
-                alpha = index * alphaIncrement
-                image = self.getImageAtAlpha(alpha)
-                path = os.path.join(tempDir.name, f'{index}.png')
-                imageio.imwrite(path, image)
-                print('generating:', alpha)
-            except IndexError:
-                print(alpha)
+            alpha = index * alphaIncrement
+            print('generating:', alpha)
+            image = self.getImageAtAlpha(alpha)
+            path = os.path.join(tempDir.name, f'{index}.png')
+            imageio.imwrite(path, image)
+            gc.collect()
+            print('generated')
+
         if includeReversed is False:
             (
                 ffmpeg
@@ -268,6 +241,78 @@ class Morpher:
             joined = ffmpeg.concat(in1, v2).node
             out = ffmpeg.output(joined, targetFilePath)
             out.run()
+
+
+class ColorMorpher(Morpher):
+    def __init__(self, leftImage, leftTriangles, rightImage, rightTriangles):
+        super(ColorMorpher, self).__init__(leftImage, leftTriangles, rightImage, rightTriangles)
+
+    def getImageAtAlpha(self, alpha):
+        if alpha < 0 or alpha > 1:
+            raise ValueError('alpha should be within [0, 1]')
+
+        # generate middle triangle
+        midTriangles = self._generateMiddleTri(alpha)
+        # create middle image and begin transformation process
+        midImage = np.zeros(self.leftImage.shape)
+
+        # blue
+        leftInterpB = RectBivariateSpline(range(self.leftImage.shape[0]),
+                                          range(self.leftImage.shape[1]),
+                                          self.leftImage[:, :, 0],
+                                          kx=1, ky=1)
+        rightInterpB = RectBivariateSpline(range(self.rightImage.shape[0]),
+                                           range(self.rightImage.shape[1]),
+                                           self.rightImage[:, :, 0],
+                                           kx=1, ky=1)
+
+        # Green
+        leftInterpG = RectBivariateSpline(range(self.leftImage.shape[0]),
+                                          range(self.leftImage.shape[1]),
+                                          self.leftImage[:, :, 1],
+                                          kx=1, ky=1)
+        rightInterpG = RectBivariateSpline(range(self.rightImage.shape[0]),
+                                           range(self.rightImage.shape[1]),
+                                           self.rightImage[:, :, 1],
+                                           kx=1, ky=1)
+
+        # Red
+        leftInterpR = RectBivariateSpline(range(self.leftImage.shape[0]),
+                                          range(self.leftImage.shape[1]),
+                                          self.leftImage[:, :, 2],
+                                          kx=1, ky=1)
+        rightInterpR = RectBivariateSpline(range(self.rightImage.shape[0]),
+                                           range(self.rightImage.shape[1]),
+                                           self.rightImage[:, :, 2],
+                                           kx=1, ky=1)
+
+        for eachLeft, eachRight, eachMid in zip(self.leftTriangles, self.rightTriangles, midTriangles):
+            # calculate affine transformation matrix
+            h_matrixL, h_matrixR = hMatrixCalc(eachLeft, eachRight, eachMid)
+            h_inverseL = np.linalg.inv(h_matrixL)
+            h_inverseR = np.linalg.inv(h_matrixR)
+            # fill the middle image with affine blend
+            # find points within middle triangle
+            points = eachMid.getPoints()
+            # check for items out of bound
+            points = checkBoundary(points, self.leftImage.shape[1], self.leftImage.shape[0])
+            # insert 1 and transpose to make the become array of vertical matrix
+            # for faster matrix operation
+            points_matrix = np.insert(points, 2, 1, axis=1).T
+            leftPoint = np.matmul(h_inverseL, points_matrix)  # [0]: x ; [1]: y
+            rightPoint = np.matmul(h_inverseR, points_matrix)
+            # blue
+            midImage[points[:, 1], points[:, 0], 0] = (1 - alpha) * leftInterpB.ev(leftPoint[1], leftPoint[0])
+            midImage[points[:, 1], points[:, 0], 0] += alpha * rightInterpB.ev(rightPoint[1], rightPoint[0])
+
+            # green
+            midImage[points[:, 1], points[:, 0], 1] = (1 - alpha) * leftInterpG.ev(leftPoint[1], leftPoint[0])
+            midImage[points[:, 1], points[:, 0], 1] += alpha * rightInterpG.ev(rightPoint[1], rightPoint[0])
+
+            # red
+            midImage[points[:, 1], points[:, 0], 2] = (1 - alpha) * leftInterpR.ev(leftPoint[1], leftPoint[0])
+            midImage[points[:, 1], points[:, 0], 2] += alpha * rightInterpR.ev(rightPoint[1], rightPoint[0])
+        return midImage.astype(np.uint8)
 
 
 # takes points, self.leftImage.shape[1], self.leftImage.shape[0]
@@ -352,14 +397,18 @@ if __name__ == '__main__':
     # print(triangleTest.getPoints().sort() == triangleTest.getPoints2().sort())
     # triangleTest.getPoints2()
 
-    leftImage_test = imageio.imread('LeftGray.png')
-    rightImage_test = imageio.imread('RightGray.png')
-    # print(leftImage_test[4][1])
-    # print(map_coordinates(leftImage_test, [[1],[1]]))
-    # print(leftImage_test.shape)
-    morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    morphed = morpher_test.getImageAtAlpha(1 / 9)
-    imageio.imwrite('result.png', morphed)
+    # leftImage_test = imageio.imread('LeftGray.png')
+    # rightImage_test = imageio.imread('RightGray.png')
+    # morpher_test = Morpher(leftImage_test, leftTri, rightImage_test, rightTri)
+    # morphed = morpher_test.getImageAtAlpha(0.25)
+    # imageio.imwrite('result.png', morphed)
+
+    leftImage_test = imageio.imread('LeftColor.png')
+    rightImage_test = imageio.imread('RightColor.png')
+    morpher_test = ColorMorpher(leftImage_test, leftTri, rightImage_test, rightTri)
+    morphed = morpher_test.getImageAtAlpha(0.5)
+    imageio.imwrite('resultColor.png', morphed)
+
     # # print(morphed[187][404])
     # plt.imshow(morphed)
     # plt.show()
@@ -375,4 +424,4 @@ if __name__ == '__main__':
     # print(tempDir_test.name)
     # image_test = os.path.join(tempDir_test.name, '1.png')
     # print(image_test)
-    morpher_test.saveVideo('out.mp4', 10, 5, False)
+    # morpher_test.saveVideo('out.mp4', 10, 5, False)

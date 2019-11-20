@@ -14,6 +14,7 @@ import imageio
 import tempfile
 import os
 import ffmpeg
+from pprint import pprint as pp
 
 
 # This function takes in the full file paths of the text files containing the (x, y)
@@ -223,11 +224,21 @@ class Morpher:
             points = eachMid.getPoints()
             # insert 1 and transpose to make the become array of vertical matrix
             # for faster matrix operation
+            for index, each in enumerate(points):
+                if each[0] >= self.leftImage.shape[1] or each[1] >= self.leftImage.shape[0]:
+                    print(index)
+                    points = np.delete(points, index, axis=0)
             points_matrix = np.insert(points, 2, 1, axis=1).T
             leftPoint = np.matmul(h_inverseL, points_matrix)  # [0]: x ; [1]: y
             rightPoint = np.matmul(h_inverseR, points_matrix)
-            midImage[points[:, 1], points[:, 0]] = (1 - alpha) * leftInterp.ev(leftPoint[1], leftPoint[0])
-            midImage[points[:, 1], points[:, 0]] += alpha * rightInterp.ev(rightPoint[1], rightPoint[0])
+            try:
+                midImage[points[:, 1], points[:, 0]] = (1 - alpha) * leftInterp.ev(leftPoint[1], leftPoint[0])
+                midImage[points[:, 1], points[:, 0]] += alpha * rightInterp.ev(rightPoint[1], rightPoint[0])
+            except IndexError:
+                # print()
+                for each in points:
+                    print(each)
+
         midImage = midImage.astype(np.uint8)
         return midImage
 

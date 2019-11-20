@@ -17,6 +17,7 @@ import ffmpeg
 from pprint import pprint as pp
 import gc
 
+
 # This function takes in the full file paths of the text files containing the (x, y)
 # coordinates of a list of points, for both the left and right images.
 # returns the tuple (leftTriangles, rightTriangles), where each is a list of instances
@@ -102,11 +103,12 @@ class Triangle:
             for x in range(ceil(min(a, b)), floor(max(a, b)) + 1):
                 points.append([x, y])
         # Find points in the lower part
-        for y in range(floor(middle[1]), floor(lower[1] + 1)):
-            a = upperLower(y)
-            b = middleLower(y)
-            for x in range(ceil(min(a, b)), floor(max(a, b)) + 1):
-                points.append([x, y])
+        if floor(middle[1]) != floor(lower[1]):
+            for y in range(floor(middle[1]), floor(lower[1] + 1)):
+                a = upperLower(y)
+                b = middleLower(y)
+                for x in range(ceil(min(a, b)), floor(max(a, b)) + 1):
+                    points.append([x, y])
         return np.array(points)
 
 
@@ -406,8 +408,8 @@ if __name__ == '__main__':
     leftImage_test = imageio.imread('LeftColor.png')
     rightImage_test = imageio.imread('RightColor.png')
     morpher_test = ColorMorpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    morphed = morpher_test.getImageAtAlpha(0.5)
-    imageio.imwrite('resultColor.png', morphed)
+    # morphed = morpher_test.getImageAtAlpha(0.5)
+    # imageio.imwrite('resultColor.png', morphed)
 
     # # print(morphed[187][404])
     # plt.imshow(morphed)
@@ -424,4 +426,5 @@ if __name__ == '__main__':
     # print(tempDir_test.name)
     # image_test = os.path.join(tempDir_test.name, '1.png')
     # print(image_test)
-    # morpher_test.saveVideo('out.mp4', 10, 5, False)
+    videoPath = os.path.join(os.getcwd(), 'out.mp4')
+    morpher_test.saveVideo(videoPath, 100, 25, False)

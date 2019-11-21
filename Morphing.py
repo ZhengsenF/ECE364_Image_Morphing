@@ -215,12 +215,10 @@ class Morpher:
         alphaIncrement = 1 / (frameCount - 1)
         for index in range(frameCount):
             alpha = index * alphaIncrement
-            print('generating:', alpha)
             image = self.getImageAtAlpha(alpha)
             path = os.path.join(tempDir.name, f'{index}.png')
             imageio.imwrite(path, image)
             gc.collect()
-            print('generated')
 
         if includeReversed is False:
             (
@@ -241,7 +239,8 @@ class Morpher:
             in2 = ffmpeg.input(tempVideoPath)
             v2 = in2.video.filter('reverse')
             joined = ffmpeg.concat(in1, v2).node
-            out = ffmpeg.output(joined, targetFilePath)
+            v3 = joined[0]
+            out = ffmpeg.output(v3,  targetFilePath)
             out.run()
 
 
@@ -408,8 +407,8 @@ if __name__ == '__main__':
     leftImage_test = imageio.imread('LeftColor.png')
     rightImage_test = imageio.imread('RightColor.png')
     morpher_test = ColorMorpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    # morphed = morpher_test.getImageAtAlpha(0.5)
-    # imageio.imwrite('resultColor.png', morphed)
+    morphed = morpher_test.getImageAtAlpha(0.5)
+    imageio.imwrite('resultColor.png', morphed)
 
     # # print(morphed[187][404])
     # plt.imshow(morphed)
@@ -426,5 +425,5 @@ if __name__ == '__main__':
     # print(tempDir_test.name)
     # image_test = os.path.join(tempDir_test.name, '1.png')
     # print(image_test)
-    videoPath = os.path.join(os.getcwd(), 'out.mp4')
-    morpher_test.saveVideo(videoPath, 100, 25, False)
+    # videoPath = os.path.join(os.getcwd(), 'out.mp4')
+    # morpher_test.saveVideo(videoPath, 100, 25, True)

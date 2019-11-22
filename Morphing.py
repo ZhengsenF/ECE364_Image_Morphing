@@ -14,8 +14,6 @@ import imageio
 import tempfile
 import os
 import ffmpeg
-from pprint import pprint as pp
-import gc
 
 
 # This function takes in the full file paths of the text files containing the (x, y)
@@ -218,7 +216,6 @@ class Morpher:
             image = self.getImageAtAlpha(alpha)
             path = os.path.join(tempDir.name, f'{index}.png')
             imageio.imwrite(path, image)
-            gc.collect()
 
         if includeReversed is False:
             (
@@ -407,8 +404,8 @@ if __name__ == '__main__':
     leftImage_test = imageio.imread('LeftColor.png')
     rightImage_test = imageio.imread('RightColor.png')
     morpher_test = ColorMorpher(leftImage_test, leftTri, rightImage_test, rightTri)
-    morphed = morpher_test.getImageAtAlpha(0.5)
-    imageio.imwrite('resultColor.png', morphed)
+    # morphed = morpher_test.getImageAtAlpha(0.5)
+    # imageio.imwrite('resultColor.png', morphed)
 
     # # print(morphed[187][404])
     # plt.imshow(morphed)
@@ -425,5 +422,5 @@ if __name__ == '__main__':
     # print(tempDir_test.name)
     # image_test = os.path.join(tempDir_test.name, '1.png')
     # print(image_test)
-    # videoPath = os.path.join(os.getcwd(), 'out.mp4')
-    # morpher_test.saveVideo(videoPath, 100, 25, True)
+    videoPath = os.path.join(os.getcwd(), 'out.mp4')
+    morpher_test.saveVideo(videoPath, 10, 5, True)

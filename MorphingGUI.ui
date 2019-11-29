@@ -44,12 +44,12 @@
     <rect>
      <x>10</x>
      <y>50</y>
-     <width>301</width>
+     <width>311</width>
      <height>221</height>
     </rect>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="imageRight">
+  <widget class="QGraphicsView" name="imageRightViewer">
    <property name="geometry">
     <rect>
      <x>330</x>
@@ -160,7 +160,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="imageBlend">
+  <widget class="QGraphicsView" name="imageBlendViwer">
    <property name="geometry">
     <rect>
      <x>180</x>

@@ -39,7 +39,7 @@
     <string>Load Ending Image ...</string>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="imageLeft">
+  <widget class="QGraphicsView" name="imageLeftViewer">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -160,7 +160,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="imageLeft_2">
+  <widget class="QGraphicsView" name="imageBlend">
    <property name="geometry">
     <rect>
      <x>180</x>

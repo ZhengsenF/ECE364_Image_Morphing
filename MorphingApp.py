@@ -66,6 +66,13 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         self.imageRightViewer.mousePressEvent = self.rightClicked
         self.mousePressEvent = self.elseClicked
 
+        # blend
+        self.btnBlend.connect(self.blend)
+
+    def blend(self):
+        pass
+
+
     def elseClicked(self, position):
         if not (self.leftNew and self.rightNew):
             return
@@ -112,6 +119,8 @@ class MorphingApp(QMainWindow, Ui_Dialog):
 
     # reload the image, points and lines
     def leftReload(self):
+        if len(self.leftPoints) >= 3:
+            self.checkBox.setDisabled(False)
         image, self.leftPointsPath = loadImage(self.leftImagePath)
         self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
         self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
@@ -166,28 +175,8 @@ class MorphingApp(QMainWindow, Ui_Dialog):
     def showTri(self):
         # box uncheck
         if not self.checkBox.isChecked():
-            self.imageLeftViewer.scene.clear()
-            self.imageRightViewer.scene.clear()
-            # reload left
-            image, self.leftPointsPath = loadImage(self.rightImagePath)
-            self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
-            self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
-            self.imageLeftViewer.setScene(self.imageLeftViewer.scene)
-            self.imageLeftViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageLeftViewer.scene),
-                                           QtCore.Qt.KeepAspectRatio)
-            for eachPoint in self.leftPoints:
-                self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
-                                                      brush=QtGui.QBrush(QtCore.Qt.red))
-            # reload right
-            image, self.rightPointsPath = loadImage(self.rightImagePath)
-            self.imageRightViewer.scene = QtWidgets.QGraphicsScene()
-            self.imageRightViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
-            self.imageRightViewer.setScene(self.imageRightViewer.scene)
-            self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
-                                            QtCore.Qt.KeepAspectRatio)
-            for eachPoint in self.rightPoints:
-                self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
-                                                       brush=QtGui.QBrush(QtCore.Qt.red))
+            self.leftReload()
+            self.rightReload()
             return
         # box checked
         # load triangles
@@ -234,6 +223,8 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         elif self.leftLoaded and self.rightLoaded and self.correspondence:
             self.leftPointFile = open(self.leftPointsPath, 'a')
             self.rightPointFile = open(self.rightPointsPath, 'a')
+            self.leftPointFile.write('\n')
+            self.rightPointFile.write('\n')
 
     # load ending image and its points file
     def loadRight(self):
@@ -265,6 +256,8 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         elif self.leftLoaded and self.rightLoaded and self.correspondence:
             self.leftPointFile = open(self.leftPointsPath, 'a')
             self.rightPointFile = open(self.rightPointsPath, 'a')
+            self.leftPointFile.write('\n')
+            self.rightPointFile.write('\n')
 
     # text box on the right of slider bar
     def sliderValue(self):
@@ -276,7 +269,8 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         if self.leftLoaded and self.rightLoaded:
             self.Slider.setDisabled(False)
             self.btnBlend.setDisabled(False)
-            self.checkBox.setDisabled(False)
+            if self.correspondence:
+                self.checkBox.setDisabled(False)
 
 
 # load image in QPixmap form from image file path

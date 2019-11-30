@@ -28,12 +28,19 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         # variable initialization
         self.leftLoaded = False
         self.rightLoaded = False
+        self.leftNew = False
+        self.rightNew = False
+        self.correspondence = False
         self.leftImagePath = None
         self.rightImagePath = None
         self.leftPointsPath = None
         self.rightPointsPath = None
         self.leftImageShape = None
         self.rightImageShape = None
+        self.leftPointFile = None
+        self.rightPointFile = None
+        self.leftTempPoint = None
+        self.rightTempPoint = None
 
         # points and indexes initialization
         self.leftPoints = []
@@ -54,17 +61,123 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         # loaded state
         self.checkBox.toggled.connect(self.showTri)
 
+        # mouse click event
+        self.imageLeftViewer.mousePressEvent = self.leftClicked
+        self.imageRightViewer.mousePressEvent = self.rightClicked
+        self.mousePressEvent = self.elseClicked
+
+    def elseClicked(self, position):
+        if not (self.leftNew and self.rightNew):
+            return
+        self.persistPoint()
+
+    def leftClicked(self, position):
+        # not in loaded state
+        if not (self.rightLoaded and self.leftLoaded):
+            return
+        if self.leftNew and not self.rightNew:
+            return
+        if self.leftNew and self.rightNew:
+            self.persistPoint()
+        x = self.imageLeftViewer.mapToScene(position.pos()).x()
+        y = self.imageLeftViewer.mapToScene(position.pos()).y()
+        self.leftNew = True
+        self.leftTempPoint = [round(x, 1), round(y, 1)]
+        self.leftReload()
+
+    def rightClicked(self, position):
+        # not in loaded state
+        if not (self.rightLoaded and self.leftLoaded):
+            return
+        if self.rightNew:
+            return
+        x = self.imageRightViewer.mapToScene(position.pos()).x()
+        y = self.imageRightViewer.mapToScene(position.pos()).y()
+        self.rightNew = True
+        self.rightTempPoint = [round(x, 1), round(y, 1)]
+        self.rightReload()
+
+    # write points to file and reset others
+    def persistPoint(self):
+        self.leftPoints.append(self.leftTempPoint)
+        self.rightPoints.append(self.rightTempPoint)
+        self.leftPointFile.write('{:8.1f}{:8.1f}\n'.format(self.leftPoints[-1][0], self.leftPoints[-1][1]))
+        self.rightPointFile.write('{:8.1f}{:8.1f}\n'.format(self.rightPoints[-1][0], self.rightPoints[-1][1]))
+        fileSave(self.leftPointFile)
+        fileSave(self.rightPointFile)
+        self.leftNew = False
+        self.rightNew = False
+        self.leftReload()
+        self.rightReload()
+
+    # reload the image, points and lines
+    def leftReload(self):
+        image, self.leftPointsPath = loadImage(self.leftImagePath)
+        self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
+        self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
+        self.imageLeftViewer.setScene(self.imageLeftViewer.scene)
+        self.imageLeftViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageLeftViewer.scene),
+                                       QtCore.Qt.KeepAspectRatio)
+        for eachPoint in self.leftPoints[0:self.leftFromFile]:
+            self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                  brush=QtGui.QBrush(QtCore.Qt.red))
+        for eachPoint in self.leftPoints[self.leftFromFile:]:
+            self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                  brush=QtGui.QBrush(QtCore.Qt.blue))
+        if self.leftNew:
+            eachPoint = self.leftTempPoint
+            self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                  brush=QtGui.QBrush(QtCore.Qt.green))
+        if self.checkBox.isChecked():
+            leftDelaunay = Delaunay(self.leftPoints)
+            leftTriangles = triangleFromDelaunay(leftDelaunay, self.leftPoints)
+            # display triangles
+            for each in leftTriangles:
+                lines = getLines(each.vertices)
+                for eachLine in lines:
+                    self.imageLeftViewer.scene.addItem(eachLine)
+
+    def rightReload(self):
+        image, self.rightPointsPath = loadImage(self.rightImagePath)
+        self.imageRightViewer.scene = QtWidgets.QGraphicsScene()
+        self.imageRightViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
+        self.imageRightViewer.setScene(self.imageRightViewer.scene)
+        self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
+                                        QtCore.Qt.KeepAspectRatio)
+        for eachPoint in self.rightPoints[0:self.rightFromFile]:
+            self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                   brush=QtGui.QBrush(QtCore.Qt.red))
+        for eachPoint in self.rightPoints[self.rightFromFile:]:
+            self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                   brush=QtGui.QBrush(QtCore.Qt.blue))
+        if self.rightNew:
+            eachPoint = self.rightTempPoint
+            self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                   brush=QtGui.QBrush(QtCore.Qt.green))
+        if self.checkBox.isChecked():
+            leftDelaunay = Delaunay(self.rightPoints)
+            rightTriangles = triangleFromDelaunay(leftDelaunay, self.rightPoints)
+            # display triangles
+            for each in rightTriangles:
+                lines = getLines(each.vertices)
+                for eachLine in lines:
+                    self.imageRightViewer.scene.addItem(eachLine)
+
     def showTri(self):
+        # box uncheck
         if not self.checkBox.isChecked():
             self.imageLeftViewer.scene.clear()
             self.imageRightViewer.scene.clear()
             # reload left
-            image, self.leftPointsPath = loadImage(self.leftImagePath)
+            image, self.leftPointsPath = loadImage(self.rightImagePath)
             self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
             self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
             self.imageLeftViewer.setScene(self.imageLeftViewer.scene)
             self.imageLeftViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageLeftViewer.scene),
                                            QtCore.Qt.KeepAspectRatio)
+            for eachPoint in self.leftPoints:
+                self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                      brush=QtGui.QBrush(QtCore.Qt.red))
             # reload right
             image, self.rightPointsPath = loadImage(self.rightImagePath)
             self.imageRightViewer.scene = QtWidgets.QGraphicsScene()
@@ -72,21 +185,23 @@ class MorphingApp(QMainWindow, Ui_Dialog):
             self.imageRightViewer.setScene(self.imageRightViewer.scene)
             self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
                                             QtCore.Qt.KeepAspectRatio)
+            for eachPoint in self.rightPoints:
+                self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                       brush=QtGui.QBrush(QtCore.Qt.red))
             return
-        (leftTriangles, rightTriangles) = loadTriangles(self.leftPointsPath, self.rightPointsPath)
+        # box checked
+        # load triangles
+        leftDelaunay = Delaunay(self.leftPoints)
+        leftTriangles = triangleFromDelaunay(leftDelaunay, self.leftPoints)
+        rightTriangles = triangleFromDelaunay(leftDelaunay, self.rightPoints)
+        # display triangles
         for each in leftTriangles:
             lines = getLines(each.vertices)
-            for eachPoint in each.vertices:
-                self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
-                                                      brush=QtGui.QBrush(QtCore.Qt.red))
             for eachLine in lines:
                 self.imageLeftViewer.scene.addItem(eachLine)
 
         for each in rightTriangles:
             lines = getLines(each.vertices)
-            for eachPoint in each.vertices:
-                self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
-                                                       brush=QtGui.QBrush(QtCore.Qt.red))
             for eachLine in lines:
                 self.imageRightViewer.scene.addItem(eachLine)
 
@@ -107,15 +222,24 @@ class MorphingApp(QMainWindow, Ui_Dialog):
                                        QtCore.Qt.KeepAspectRatio)
         self.btnEnable()
         # open points
-        self.leftPoints, self.leftFromFile = loadPoints(self.leftPointsPath)
+        self.leftPoints, self.leftFromFile, self.correspondence = loadPoints(self.leftPointsPath)
         for eachPoint in self.leftPoints:
             self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
                                                   brush=QtGui.QBrush(QtCore.Qt.red))
+        if self.leftLoaded and self.rightLoaded and not self.correspondence:
+            self.leftPointsPath = 'tempLeft.txt'
+            self.leftPointFile = open(self.leftPointsPath, 'w')
+            self.rightPointsPath = 'tempRight.txt'
+            self.rightPointFile = open(self.rightPointsPath, 'w')
+        elif self.leftLoaded and self.rightLoaded and self.correspondence:
+            self.leftPointFile = open(self.leftPointsPath, 'a')
+            self.rightPointFile = open(self.rightPointsPath, 'a')
 
     # load ending image and its points file
     def loadRight(self):
         # open image
-        self.rightImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...', filter="files (*.png *.jpg)")
+        self.rightImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...',
+                                                             filter="files (*.png *.jpg)")
         if not self.rightImagePath:
             return
         image, self.rightPointsPath = loadImage(self.rightImagePath)
@@ -126,13 +250,21 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         self.imageRightViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
         self.imageRightViewer.setScene(self.imageRightViewer.scene)
         self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
-                                       QtCore.Qt.KeepAspectRatio)
+                                        QtCore.Qt.KeepAspectRatio)
         self.btnEnable()
         # open points
-        self.rightPoints, self.rightFromFile = loadPoints(self.rightPointsPath)
+        self.rightPoints, self.rightFromFile, self.correspondence = loadPoints(self.rightPointsPath)
         for eachPoint in self.rightPoints:
             self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
-                                                  brush=QtGui.QBrush(QtCore.Qt.red))
+                                                   brush=QtGui.QBrush(QtCore.Qt.red))
+        if self.leftLoaded and self.rightLoaded and not self.correspondence:
+            self.leftPointsPath = 'tempLeft.txt'
+            self.leftPointFile = open(self.leftPointsPath, 'w')
+            self.rightPointsPath = 'tempRight.txt'
+            self.rightPointFile = open(self.rightPointsPath, 'w')
+        elif self.leftLoaded and self.rightLoaded and self.correspondence:
+            self.leftPointFile = open(self.leftPointsPath, 'a')
+            self.rightPointFile = open(self.rightPointsPath, 'a')
 
     # text box on the right of slider bar
     def sliderValue(self):
@@ -163,7 +295,7 @@ def loadImage(filePath):
 # returns a list of points and points from file (ending index + 1)
 def loadPoints(filePath):
     if not os.path.exists(filePath):
-        return [], 0
+        return [], 0, False
     # read from file
     with open(filePath) as file:
         lines = file.readlines()
@@ -172,7 +304,7 @@ def loadPoints(filePath):
         data = eachLine.split()
         data = [float(data[0]), float(data[1])]
         points.append(data)
-    return points, len(points)
+    return points, len(points), True
 
 
 # takes triangle's vertices and image size returns lines to be plotted
@@ -180,9 +312,15 @@ def getLines(vertices):
     lines = [QtWidgets.QGraphicsLineItem(vertices[0][0], vertices[0][1], vertices[1][0], vertices[1][1]),
              QtWidgets.QGraphicsLineItem(vertices[0][0], vertices[0][1], vertices[2][0], vertices[2][1]),
              QtWidgets.QGraphicsLineItem(vertices[1][0], vertices[1][1], vertices[2][0], vertices[2][1])]
-    for index, each in enumerate(lines):
+    for each in lines:
         each.setPen(QtGui.QPen(QtCore.Qt.red, 1))
     return lines
+
+
+# save the file immediately after write
+def fileSave(file):
+    file.flush()
+    os.fsync(file.fileno())
 
 
 if __name__ == "__main__":

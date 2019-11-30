@@ -18,15 +18,22 @@ class MorphingApp(QMainWindow, Ui_Dialog):
     def __init__(self, parent=None):
         super(MorphingApp, self).__init__(parent)
         self.setupUi(self)
+
+        # widget initialization
         self.alphaShow.setDisabled(True)
         self.Slider.setDisabled(True)
         self.btnBlend.setDisabled(True)
+        self.checkBox.setDisabled(True)
+
+        # variable initialization
         self.leftLoaded = False
         self.rightLoaded = False
         self.leftImagePath = None
         self.rightImagePath = None
         self.leftPointsPath = None
         self.rightPointsPath = None
+        self.leftImageShape = None
+        self.rightImageShape = None
 
         # slider init
         alphaValue = self.Slider.value() / 20
@@ -43,66 +50,105 @@ class MorphingApp(QMainWindow, Ui_Dialog):
 
     def showTri(self):
         if not self.checkBox.isChecked():
+            self.imageLeftViewer.scene.clear()
+            self.imageRightViewer.scene.clear()
+            # reload left
+            image, self.leftPointsPath = loadImage(self.leftImagePath)
+            self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
+            self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
+            self.imageLeftViewer.setScene(self.imageLeftViewer.scene)
+            self.imageLeftViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageLeftViewer.scene),
+                                           QtCore.Qt.KeepAspectRatio)
+            # reload right
+            image, self.rightPointsPath = loadImage(self.rightImagePath)
+            self.imageRightViewer.scene = QtWidgets.QGraphicsScene()
+            self.imageRightViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
+            self.imageRightViewer.setScene(self.imageRightViewer.scene)
+            self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
+                                            QtCore.Qt.KeepAspectRatio)
             return
-        (leftTri, rightTri) = loadTriangles(self.leftPointsPath, self.rightPointsPath)
-        for each in leftTri:
-            points = getPoints(each.vertices)
-            for eachPoint in points:
-                self.imageLeftViewer.scene.addItem(eachPoint)
-        for each in rightTri:
-            points = getPoints(each.vertices)
-            for eachPoint in points:
-                self.imageRightViewer.scene.addItem(eachPoint)
+        (leftTriangles, rightTriangles) = loadTriangles(self.leftPointsPath, self.rightPointsPath)
+        for each in leftTriangles:
+            lines = getLines(each.vertices)
+            for eachPoint in each.vertices:
+                self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 5, eachPoint[1] - 5, 10, 10),
+                                                      brush=QtGui.QBrush(QtCore.Qt.red))
+            for eachLine in lines:
+                self.imageLeftViewer.scene.addItem(eachLine)
 
+        for each in rightTriangles:
+            lines = getLines(each.vertices)
+            for eachPoint in each.vertices:
+                self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 5, eachPoint[1] - 5, 10, 10),
+                                                       brush=QtGui.QBrush(QtCore.Qt.red))
+            for eachLine in lines:
+                self.imageRightViewer.scene.addItem(eachLine)
+
+    # load starting image and its points file
     def loadLeft(self):
         self.leftImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...', filter="files (*.png *.jpg)")
         if not self.leftImagePath:
             return
         image, self.leftPointsPath = loadImage(self.leftImagePath)
         self.leftLoaded = True
+        self.leftImageShape = imageio.imread(self.leftImagePath).shape
         self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
         self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
         self.imageLeftViewer.setScene(self.imageLeftViewer.scene)
+        self.imageLeftViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageLeftViewer.scene),
+                                       QtCore.Qt.KeepAspectRatio)
         self.btnEnable()
 
+    # load ending image and its points file
     def loadRight(self):
-        self.rightImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...', filter="files (*.png *.jpg)")
+        self.rightImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...',
+                                                             filter="files (*.png *.jpg)")
         if not self.rightImagePath:
             return
         image, self.rightPointsPath = loadImage(self.rightImagePath)
         self.rightLoaded = True
+        self.rightImageShape = imageio.imread(self.rightImagePath).shape
         self.imageRightViewer.scene = QtWidgets.QGraphicsScene()
         self.imageRightViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
         self.imageRightViewer.setScene(self.imageRightViewer.scene)
+        self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
+                                        QtCore.Qt.KeepAspectRatio)
         self.btnEnable()
 
+    # text box on the right of slider bar
     def sliderValue(self):
         alphaValue = self.Slider.value() / 20
         self.alphaShow.setText('{0:2.2f}'.format(alphaValue))
 
+    # check if both images are loaded. If so, enable rest of the functionality of the app
     def btnEnable(self):
         if self.leftLoaded and self.rightLoaded:
             self.Slider.setDisabled(False)
             self.btnBlend.setDisabled(False)
+            self.checkBox.setDisabled(False)
 
 
+# load image in QPixmap form from image file path
+# returns such image and the path of its points map
 def loadImage(filePath):
     # image = imageio.imread(filePath)
     pointsPath = filePath + '.txt'
     image = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(open(filePath, 'rb').read()))
     # image = image.scaledToHeight(200)
     # image = image.scaledToWidth(290)
-    image = image.scaled(290, 200, QtCore.Qt.KeepAspectRatio)
+    # image = image.scaled(290, 200)
     return image, pointsPath
 
 
-def getPoints(vertices):
-    point = [QtWidgets.QGraphicsLineItem(vertices[0][0], vertices[0][1], vertices[1][0], vertices[1][1]),
+# takes triangle's vertices and image size returns lines to be plotted
+def getLines(vertices):
+    lines = [QtWidgets.QGraphicsLineItem(vertices[0][0], vertices[0][1], vertices[1][0], vertices[1][1]),
              QtWidgets.QGraphicsLineItem(vertices[0][0], vertices[0][1], vertices[2][0], vertices[2][1]),
-             QtWidgets.QGraphicsLineItem(vertices[1][0], vertices[1][1], vertices[1][0], vertices[1][1])]
-    for index, each in enumerate(point):
+             QtWidgets.QGraphicsLineItem(vertices[1][0], vertices[1][1], vertices[2][0], vertices[2][1])]
+    for index, each in enumerate(lines):
         each.setPen(QtGui.QPen(QtCore.Qt.red, 1))
-    return point
+    return lines
+
 
 if __name__ == "__main__":
     currentApp = QApplication(sys.argv)

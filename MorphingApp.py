@@ -67,11 +67,27 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         self.mousePressEvent = self.elseClicked
 
         # blend
-        self.btnBlend.connect(self.blend)
+        self.btnBlend.clicked.connect(self.blend)
 
     def blend(self):
-        pass
-
+        (leftTriangle, rightTriangle) = loadTriangles(self.leftPointsPath, self.rightPointsPath)
+        leftImage = imageio.imread(self.leftImagePath)
+        rightImage = imageio.imread(self.rightImagePath)
+        morpher = ColorMorpher(leftImage, leftTriangle, rightImage, rightTriangle)
+        alpha = self.Slider.value() / 20
+        morphed = morpher.getImageAtAlpha(alpha)
+        imagePath = 'resultColor.png'
+        imagePath = os.path.join(os.getcwd(), imagePath)
+        imageio.imwrite(imagePath, morphed)
+        image, _ = loadImage(imagePath)
+        print(image)
+        self.imageBlendViwer.scene = QtWidgets.QGraphicsScene()
+        self.imageBlendViwer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
+        self.imageBlendViwer.setScene(self.imageBlendViwer.scene)
+        self.imageBlendViwer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageBlendViwer.scene),
+                                       QtCore.Qt.KeepAspectRatio)
+        self.imageBlendViwer.update()
+        print('debug')
 
     def elseClicked(self, position):
         if not (self.leftNew and self.rightNew):
@@ -296,8 +312,9 @@ def loadPoints(filePath):
     points = []
     for eachLine in lines:
         data = eachLine.split()
-        data = [float(data[0]), float(data[1])]
-        points.append(data)
+        if data:
+            data = [float(data[0]), float(data[1])]
+            points.append(data)
     return points, len(points), True
 
 

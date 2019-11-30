@@ -55,8 +55,9 @@ def pointsFromFile(filePath):
     result = []
     for eachLine in lines:
         data = eachLine.split()
-        data = [float(data[0]), float(data[1])]
-        result.append(data)
+        if data:
+            data = [float(data[0]), float(data[1])]
+            result.append(data)
     return np.array(result)
 
 

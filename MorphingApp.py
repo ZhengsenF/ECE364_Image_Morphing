@@ -35,6 +35,12 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         self.leftImageShape = None
         self.rightImageShape = None
 
+        # points and indexes initialization
+        self.leftPoints = []
+        self.rightPoints = []
+        self.leftFromFile = 0
+        self.rightFromFile = 0
+
         # slider init
         alphaValue = self.Slider.value() / 20
         self.alphaShow.setText('{0:2.2f}'.format(alphaValue))
@@ -71,7 +77,7 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         for each in leftTriangles:
             lines = getLines(each.vertices)
             for eachPoint in each.vertices:
-                self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 5, eachPoint[1] - 5, 10, 10),
+                self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
                                                       brush=QtGui.QBrush(QtCore.Qt.red))
             for eachLine in lines:
                 self.imageLeftViewer.scene.addItem(eachLine)
@@ -79,41 +85,54 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         for each in rightTriangles:
             lines = getLines(each.vertices)
             for eachPoint in each.vertices:
-                self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 5, eachPoint[1] - 5, 10, 10),
+                self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
                                                        brush=QtGui.QBrush(QtCore.Qt.red))
             for eachLine in lines:
                 self.imageRightViewer.scene.addItem(eachLine)
 
     # load starting image and its points file
     def loadLeft(self):
+        # open image
         self.leftImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...', filter="files (*.png *.jpg)")
         if not self.leftImagePath:
             return
         image, self.leftPointsPath = loadImage(self.leftImagePath)
         self.leftLoaded = True
         self.leftImageShape = imageio.imread(self.leftImagePath).shape
+        # manipulate viewer
         self.imageLeftViewer.scene = QtWidgets.QGraphicsScene()
         self.imageLeftViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
         self.imageLeftViewer.setScene(self.imageLeftViewer.scene)
         self.imageLeftViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageLeftViewer.scene),
                                        QtCore.Qt.KeepAspectRatio)
         self.btnEnable()
+        # open points
+        self.leftPoints, self.leftFromFile = loadPoints(self.leftPointsPath)
+        for eachPoint in self.leftPoints:
+            self.imageLeftViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                  brush=QtGui.QBrush(QtCore.Qt.red))
 
     # load ending image and its points file
     def loadRight(self):
-        self.rightImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...',
-                                                             filter="files (*.png *.jpg)")
+        # open image
+        self.rightImagePath, _ = QFileDialog.getOpenFileName(self, caption='Open file ...', filter="files (*.png *.jpg)")
         if not self.rightImagePath:
             return
         image, self.rightPointsPath = loadImage(self.rightImagePath)
         self.rightLoaded = True
         self.rightImageShape = imageio.imread(self.rightImagePath).shape
+        # manipulate viewer
         self.imageRightViewer.scene = QtWidgets.QGraphicsScene()
         self.imageRightViewer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
         self.imageRightViewer.setScene(self.imageRightViewer.scene)
         self.imageRightViewer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageRightViewer.scene),
-                                        QtCore.Qt.KeepAspectRatio)
+                                       QtCore.Qt.KeepAspectRatio)
         self.btnEnable()
+        # open points
+        self.rightPoints, self.rightFromFile = loadPoints(self.rightPointsPath)
+        for eachPoint in self.rightPoints:
+            self.imageRightViewer.scene.addEllipse(QtCore.QRectF(eachPoint[0] - 10, eachPoint[1] - 10, 20, 20),
+                                                  brush=QtGui.QBrush(QtCore.Qt.red))
 
     # text box on the right of slider bar
     def sliderValue(self):
@@ -138,6 +157,22 @@ def loadImage(filePath):
     # image = image.scaledToWidth(290)
     # image = image.scaled(290, 200)
     return image, pointsPath
+
+
+# take filePath of the points
+# returns a list of points and points from file (ending index + 1)
+def loadPoints(filePath):
+    if not os.path.exists(filePath):
+        return [], 0
+    # read from file
+    with open(filePath) as file:
+        lines = file.readlines()
+    points = []
+    for eachLine in lines:
+        data = eachLine.split()
+        data = [float(data[0]), float(data[1])]
+        points.append(data)
+    return points, len(points)
 
 
 # takes triangle's vertices and image size returns lines to be plotted

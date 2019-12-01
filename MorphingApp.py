@@ -127,6 +127,8 @@ class MorphingApp(QMainWindow, Ui_Dialog):
             return
         if self.rightNew:
             return
+        if not self.leftNew:
+            return
         x = self.imageRightViewer.mapToScene(position.pos()).x()
         y = self.imageRightViewer.mapToScene(position.pos()).y()
         self.rightNew = True

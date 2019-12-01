@@ -75,7 +75,6 @@ class MorphingApp(QMainWindow, Ui_Dialog):
     def back(self, event):
         if event.key() == QtCore.Qt.Key_Backspace:
             if self.rightNew:
-                print('debug right')
                 self.rightNew = False
                 self.rightReload()
             elif self.leftNew:
@@ -83,7 +82,11 @@ class MorphingApp(QMainWindow, Ui_Dialog):
                 self.leftReload()
 
     def blend(self):
-        (leftTriangle, rightTriangle) = loadTriangles(self.leftPointsPath, self.rightPointsPath)
+        leftPoints = np.array(self.leftPoints)
+        rightPoints = np.array(self.rightPoints)
+        leftDelaunay = Delaunay(leftPoints)
+        leftTriangle = triangleFromDelaunay(leftDelaunay, leftPoints)
+        rightTriangle = triangleFromDelaunay(leftDelaunay, rightPoints)
         leftImage = imageio.imread(self.leftImagePath)
         rightImage = imageio.imread(self.rightImagePath)
         morpher = ColorMorpher(leftImage, leftTriangle, rightImage, rightTriangle)
@@ -93,14 +96,12 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         imagePath = os.path.join(os.getcwd(), imagePath)
         imageio.imwrite(imagePath, morphed)
         image, _ = loadImage(imagePath)
-        print(image)
         self.imageBlendViwer.scene = QtWidgets.QGraphicsScene()
         self.imageBlendViwer.scene.addItem(QtWidgets.QGraphicsPixmapItem(image))
         self.imageBlendViwer.setScene(self.imageBlendViwer.scene)
         self.imageBlendViwer.fitInView(QtWidgets.QGraphicsScene.itemsBoundingRect(self.imageBlendViwer.scene),
                                        QtCore.Qt.KeepAspectRatio)
         self.imageBlendViwer.update()
-        print('debug')
 
     def elseClicked(self, position):
         if not (self.leftNew and self.rightNew):

@@ -66,8 +66,21 @@ class MorphingApp(QMainWindow, Ui_Dialog):
         self.imageRightViewer.mousePressEvent = self.rightClicked
         self.mousePressEvent = self.elseClicked
 
+        # keyboard event
+        self.keyPressEvent = self.back
+
         # blend
         self.btnBlend.clicked.connect(self.blend)
+
+    def back(self, event):
+        if event.key() == QtCore.Qt.Key_Backspace:
+            if self.rightNew:
+                print('debug right')
+                self.rightNew = False
+                self.rightReload()
+            elif self.leftNew:
+                self.leftNew = False
+                self.leftReload()
 
     def blend(self):
         (leftTriangle, rightTriangle) = loadTriangles(self.leftPointsPath, self.rightPointsPath)
